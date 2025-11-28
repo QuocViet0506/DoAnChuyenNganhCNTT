@@ -1,5 +1,23 @@
 <?php
 session_start();
+require_once 'config/db.php'; // Kết nối cơ sở dữ liệu
+
+// Kiểm tra nếu người dùng đã đăng nhập
+if (!isset($_SESSION['user_id'])) {
+    header("Location: Dangnhap/login.php");
+    exit();
+}
+
+// Lấy thông tin người dùng
+$ten = $_SESSION['ten'];
+$anh_dai_dien = isset($_SESSION['anh_dai_dien']) && !empty($_SESSION['anh_dai_dien'])
+    ? $_SESSION['anh_dai_dien']
+    : 'assets/images/default.png';
+
+// Lấy các tour nổi bật từ cơ sở dữ liệu
+$query = $pdo->prepare("SELECT * FROM tours LIMIT 3");
+$query->execute();
+$tours = $query->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -7,71 +25,210 @@ session_start();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tour Du Lịch Đồng Tháp</title>
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title>Trang chủ - Đồng Tháp Tour</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: url('assets/images/dongthap.png') no-repeat center center fixed;
+            background-size: cover;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* --- Header --- */
+        header {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-container img {
+            width: 60px;
+            height: 60px;
+            border-radius: 15px;
+            background: white;
+            padding: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .logo-container h2 {
+            font-family: 'Pacifico', cursive;
+            font-size: 28px;
+            color: #fff;
+            margin: 0;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-info img {
+            width: 40px;
+            height: 40px;
+            border-radius: 6px;
+            object-fit: cover;
+            border: 2px solid #fff;
+        }
+
+        .logout-btn {
+            background-color: white;
+            color: #007bff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 500;
+            transition: 0.2s;
+        }
+
+        .logout-btn:hover {
+            background-color: #e3f2fd;
+        }
+
+        /* --- Thanh menu --- */
+        nav {
+            background-color: #e3f2fd;
+            padding: 10px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #007bff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        .nav-links a {
+            color: #007bff;
+            text-decoration: none;
+            margin: 0 15px;
+            font-weight: 500;
+            transition: 0.2s;
+        }
+
+        .nav-links a:hover {
+            text-decoration: underline;
+            color: #0056b3;
+        }
+
+        /* --- Khung nội dung --- */
+        .container {
+            max-width: 1100px;
+            margin: 70px auto;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 50px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+
+        h1 {
+            color: #007bff;
+            font-size: 30px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        p {
+            font-size: 17px;
+        }
+
+        .tour-list {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .tour-item {
+            width: 30%;
+            text-align: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .tour-item img {
+            width: 100%;
+            border-radius: 8px;
+        }
+
+        .tour-item h3 {
+            color: #007bff;
+            font-size: 18px;
+            margin: 10px 0;
+        }
+
+        .tour-item p {
+            font-size: 14px;
+            color: #555;
+        }
+
+        .tour-item a {
+            text-decoration: none;
+            color: #007bff;
+            font-weight: bold;
+        }
+
+        .tour-item a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-    <!-- Header -->
     <header>
-        <div class="container">
-            <h1>Chào mừng đến với Tour Du Lịch Đồng Tháp</h1>
-            <nav>
-                <ul>
-                    <li><a href="index.php">Trang chủ</a></li>
-                    <li><a href="tours.php">Các Tour Du Lịch</a></li>
-                    <li><a href="news.php">Tin Tức</a></li>
-                    <li><a href="contact.php">Liên hệ</a></li>
-                    <?php if (!isset($_SESSION['user'])): ?>
-                        <li><a href="login.php">Đăng Nhập</a></li>
-                        <li><a href="register.php">Đăng Ký</a></li>
-                    <?php else: ?>
-                        <li><a href="logout.php">Đăng Xuất</a></li>
-                    <?php endif; ?>
-                </ul>
-            </nav>
+        <div class="logo-container">
+            <img src="assets/images/logo.png" alt="Logo Đồng Tháp Tour">
+            <h2>Đồng Tháp Tour</h2>
+        </div>
+
+        <div class="user-info">
+            <img src="<?php echo htmlspecialchars($anh_dai_dien); ?>" alt="Avatar">
+            <a href="profile.php" style="color:white;"><b><?php echo htmlspecialchars($ten); ?></b></a> |
+            <a href="logout.php" class="logout-btn">Đăng xuất</a>
         </div>
     </header>
 
-    <!-- Main Content -->
+    <nav>
+        <div class="nav-links">
+            <a href="index.php">Trang chủ</a>
+            <a href="dat_tour.php">Đặt tour</a>
+            <a href="#">Giới thiệu</a>
+            <a href="#">Liên hệ</a>
+            <a href="#">Ưu đãi</a>
+        </div>
+    </nav>
+
     <div class="container">
-        <section class="intro">
-            <h2>Khám Phá Đồng Tháp</h2>
-            <p>Đồng Tháp là một trong những tỉnh miền Tây Nam Bộ nổi tiếng với vẻ đẹp thiên nhiên, các điểm du lịch sinh thái và đặc sản độc đáo. Hãy cùng chúng tôi khám phá các tour du lịch hấp dẫn tại đây!</p>
-        </section>
+        <h1>Chào mừng <?php echo htmlspecialchars($ten); ?> đến với Đồng Tháp Tour!</h1>
+        <p>Khám phá vẻ đẹp miền Tây — Đồng Tháp sen hồng 🌸</p>
 
-        <!-- Featured Tours Section -->
-        <section class="featured-tours">
-            <h2>Các Tour Du Lịch Nổi Bật</h2>
-            <div class="tour-list">
+        <h2>Các Tour Du Lịch Nổi Bật</h2>
+        <div class="tour-list">
+            <?php foreach ($tours as $tour): ?>
                 <div class="tour-item">
-                    <img src="assets/images/tour1.jpg" alt="Tour 1">
-                    <h3>Tour Đồng Tháp Mười</h3>
-                    <p>Khám phá các cánh đồng lúa mênh mông, trải nghiệm cuộc sống miền Tây đích thực.</p>
-                    <a href="tour_details.php?id=1">Xem chi tiết</a>
+                    <img src="assets/images/<?php echo $tour['image']; ?>" alt="Tour <?php echo $tour['tour_id']; ?>">
+                    <h3><?php echo $tour['tour_name']; ?></h3>
+                    <p><?php echo $tour['description']; ?></p>
+                    <a href="tour_details.php?id=<?php echo $tour['tour_id']; ?>">Xem chi tiết</a>
                 </div>
-                <div class="tour-item">
-                    <img src="assets/images/tour2.jpg" alt="Tour 2">
-                    <h3>Tour Rừng Tràm</h3>
-                    <p>Tham quan rừng tràm, ngắm cảnh và tìm hiểu hệ sinh thái phong phú.</p>
-                    <a href="tour_details.php?id=2">Xem chi tiết</a>
-                </div>
-                <div class="tour-item">
-                    <img src="assets/images/tour3.jpg" alt="Tour 3">
-                    <h3>Tour Chợ Tình Sa Đéc</h3>
-                    <p>Trải nghiệm chợ tình đặc sắc và những món ăn ngon tại Sa Đéc.</p>
-                    <a href="tour_details.php?id=3">Xem chi tiết</a>
-                </div>
-            </div>
-        </section>
+            <?php endforeach; ?>
+        </div>
 
-        <!-- Footer Section -->
-        <footer>
-            <div class="container">
-                <p>&copy; 2025 Tour Du Lịch Đồng Tháp. Tất cả các quyền được bảo lưu.</p>
-            </div>
-        </footer>
+        <p style="margin-top:20px;">Trang này chỉ xem được khi bạn đã đăng nhập.</p>
     </div>
-
-    <script src="assets/js/script.js"></script>
 </body>
 </html>
