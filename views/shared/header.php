@@ -69,8 +69,8 @@ $avatar = isset($_SESSION['anh_dai_dien']) && !empty($_SESSION['anh_dai_dien']) 
                         </ul>
                     </div>
                     <?php else: ?>
-                    <a href="views/auth/login.php" class="btn btn-light btn-sm fw-bold">Đăng Nhập</a>
-                    <a href="views/auth/register.php" class="btn btn-outline-light btn-sm">Đăng Ký</a>
+                    <a href="login.php" class="btn btn-light btn-sm fw-bold">Đăng Nhập</a>
+                    <a href="register.php" class="btn btn-outline-light btn-sm">Đăng Ký</a>
                     <?php endif; ?>
                 </div>
             </div>
