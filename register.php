@@ -1,132 +1,141 @@
 <?php
-session_start(); // Khởi tạo session để kiểm tra đăng nhập
-require_once 'config/db.php'; // Kết nối cơ sở dữ liệu
+session_start();
+require_once 'config/db.php';
+require_once 'models/User.php';
 
-// Nếu đã đăng nhập thì chuyển về trang chủ
 if (isset($_SESSION['user_id'])) {
     header('Location: index.php');
     exit();
 }
 
-// Tạo CSRF token nếu chưa có
+// Tạo CSRF token
 if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(24)); // Tạo CSRF token
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
 }
 
-$errors = []; // Mảng lưu các lỗi
-$old = ['email' => '', 'phone' => '']; // Lưu thông tin cũ khi người dùng nhập sai
+$errors = [];
+$old = ['email' => '', 'phone' => ''];
 
-// Xử lý khi người dùng gửi form đăng ký
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Kiểm tra CSRF token
+    // Check CSRF
     if (empty($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
-        $errors[] = 'Yêu cầu không hợp lệ. Vui lòng thử lại.';
+        $errors[] = 'Lỗi bảo mật. Vui lòng thử lại.';
     }
 
-    // Lấy dữ liệu người dùng nhập vào
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $password_confirm = $_POST['password_confirm'] ?? '';
     $phone = trim($_POST['phone'] ?? '');
 
-    // Lưu lại các giá trị đã nhập
     $old['email'] = $email;
     $old['phone'] = $phone;
 
-    // Validate
-    if ($email === '' || $password === '' || $phone === '') {
+    // Validate cơ bản
+    if (empty($email) || empty($password) || empty($phone)) {
         $errors[] = 'Vui lòng điền đầy đủ thông tin.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Email không hợp lệ.';
+    } elseif (mb_strlen($password) < 6) {
+        $errors[] = 'Mật khẩu phải từ 6 ký tự trở lên.';
+    } elseif ($password !== $password_confirm) {
+        $errors[] = 'Mật khẩu xác nhận không khớp.';
     } else {
-        // Kiểm tra email hợp lệ
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = 'Email không hợp lệ.';
-        }
-        // Kiểm tra mật khẩu
-        if (mb_strlen($password) < 8) {
-            $errors[] = 'Mật khẩu phải có ít nhất 8 ký tự.';
-        }
-        if ($password !== $password_confirm) {
-            $errors[] = 'Mật khẩu xác nhận không khớp.';
-        }
-        // Kiểm tra số điện thoại hợp lệ (cho phép +, số, khoảng trắng, -)
-        if (!preg_match('/^[0-9+\s\-]{7,20}$/', $phone)) {
-            $errors[] = 'Số điện thoại không hợp lệ.';
-        }
-    }
-
-    // Nếu không có lỗi thì kiểm tra email tồn tại và lưu
-    if (empty($errors)) {
-        // Kiểm tra email đã tồn tại chưa
-        $stmt = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        if ($stmt->fetch()) {
-            $errors[] = 'Email này đã được đăng ký. Vui lòng chọn email khác.';
+        // Kiểm tra email trùng lặp qua Model
+        if (User::emailExists($pdo, $email)) {
+            $errors[] = 'Email này đã được sử dụng.';
         } else {
-            // Mã hóa mật khẩu
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("INSERT INTO users (email, password, phone, role) VALUES (?, ?, ?, 'customer')");
-            $stmt->execute([$email, $hashed_password, $phone]);
-
-            // Đăng ký thành công, chuyển hướng đến trang đăng nhập
-            $_SESSION['success_message'] = "Đăng ký thành công. Bạn có thể đăng nhập ngay.";
-            // Đổi CSRF token sau khi hành động thành công
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(24));
-            header('Location: login.php');
-            exit();
+            // Đăng ký qua Model
+            if (User::register($pdo, $email, $password, $phone, 'customer')) {
+                $_SESSION['success_message'] = "Đăng ký thành công! Bạn có thể đăng nhập ngay.";
+                // Reset token
+                unset($_SESSION['csrf_token']);
+                header('Location: login.php');
+                exit();
+            } else {
+                $errors[] = 'Lỗi hệ thống, vui lòng thử lại sau.';
+            }
         }
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Đăng Ký</title>
+    <title>Đăng Ký - Đồng Tháp Tour</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
+    <style>
+    body {
+        background: url('assets/images/background.jpg') no-repeat center center fixed;
+        background-size: cover;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .register-container {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 30px;
+        border-radius: 10px;
+        width: 100%;
+        max-width: 450px;
+        margin: 20px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    }
+    </style>
 </head>
+
 <body>
     <div class="register-container">
-        <form method="POST" class="register-form" novalidate>
-            <h2>Đăng Ký Tài Khoản</h2>
+        <h3 class="text-center text-primary mb-4">Đăng Ký Tài Khoản</h3>
 
-            <!-- Hiển thị thông báo lỗi nếu có -->
-            <?php if (!empty($errors)): ?>
-                <div style="color:red; margin-bottom:10px;">
-                    <?php foreach ($errors as $e): ?>
-                        <div><?php echo htmlspecialchars($e); ?></div>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
+        <?php if (!empty($errors)): ?>
+        <div class="alert alert-danger">
+            <ul class="mb-0 ps-3">
+                <?php foreach ($errors as $e): ?>
+                <li><?php echo htmlspecialchars($e); ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+        <?php endif; ?>
 
-            <!-- Thông báo thành công -->
-            <?php if (!empty($_SESSION['success_message'])): ?>
-                <div style="color:green; margin-bottom:10px;">
-                    <?php echo htmlspecialchars($_SESSION['success_message']); unset($_SESSION['success_message']); ?>
-                </div>
-            <?php endif; ?>
-
-            <!-- CSRF token -->
+        <form method="POST">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token']); ?>">
 
-            <!-- Form đăng ký -->
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required value="<?php echo htmlspecialchars($old['email']); ?>">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Email</label>
+                <input type="email" name="email" class="form-control" required
+                    value="<?php echo htmlspecialchars($old['email']); ?>">
+            </div>
 
-            <label for="password">Mật khẩu:</label>
-            <input type="password" id="password" name="password" required>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Số điện thoại</label>
+                <input type="text" name="phone" class="form-control" required
+                    value="<?php echo htmlspecialchars($old['phone']); ?>">
+            </div>
 
-            <label for="password_confirm">Xác nhận mật khẩu:</label>
-            <input type="password" id="password_confirm" name="password_confirm" required>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">Mật khẩu</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label fw-bold">Nhập lại MK</label>
+                    <input type="password" name="password_confirm" class="form-control" required>
+                </div>
+            </div>
 
-            <label for="phone">Số điện thoại:</label>
-            <input type="text" id="phone" name="phone" required value="<?php echo htmlspecialchars($old['phone']); ?>">
-
-            <button type="submit">Đăng Ký</button>
-
-            <p style="text-align:center; margin-top:10px;">Đã có tài khoản? <a href="login.php">Đăng nhập ngay</a></p>
+            <button type="submit" class="btn btn-success w-100 py-2 fw-bold">Đăng Ký</button>
         </form>
+
+        <div class="text-center mt-3">
+            <span class="text-muted">Đã có tài khoản?</span>
+            <a href="login.php" class="fw-bold text-decoration-none">Đăng nhập ngay</a>
+        </div>
     </div>
 </body>
+
 </html>

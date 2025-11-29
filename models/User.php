@@ -1,32 +1,33 @@
 <?php
-session_start();
-require_once 'models/User.php';
+class User
+{
+    // Hàm kiểm tra đăng nhập
+    public static function login($pdo, $email, $password)
+    {
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $email = $_POST['email'];
-    $password = $_POST['password'];
+        // Kiểm tra mật khẩu (hash)
+        if ($user && password_verify($password, $user['password'])) {
+            return $user;
+        }
+        return false;
+    }
 
-    $user = User::login($GLOBALS['pdo'], $email, $password);
-    if ($user) {
-        $_SESSION['user_id'] = $user['user_id'];
-        $_SESSION['role'] = $user['role'];
-        header('Location: index.php'); // Chuyển hướng về trang chủ
-        exit();
-    } else {
-        $error = "Email hoặc mật khẩu không đúng.";
+    // Hàm kiểm tra email đã tồn tại chưa
+    public static function emailExists($pdo, $email)
+    {
+        $stmt = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        return $stmt->fetchColumn(); // Trả về true nếu có dữ liệu
+    }
+
+    // Hàm đăng ký người dùng mới
+    public static function register($pdo, $email, $password, $phone, $role = 'customer')
+    {
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("INSERT INTO users (email, password, phone, role) VALUES (?, ?, ?, ?)");
+        return $stmt->execute([$email, $hashed_password, $phone, $role]);
     }
 }
-?>
-
-<!-- HTML của form đăng nhập -->
-<form method="POST">
-    <label for="email">Email:</label><br>
-    <input type="email" id="email" name="email" required><br><br>
-
-    <label for="password">Password:</label><br>
-    <input type="password" id="password" name="password" required><br><br>
-
-    <button type="submit">Login</button>
-</form>
-
-<?php if (isset($error)) echo "<p style='color:red;'>$error</p>"; ?>
