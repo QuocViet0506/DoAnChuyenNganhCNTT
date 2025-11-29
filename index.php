@@ -1,238 +1,106 @@
 <?php
-session_start();
-require_once 'config/db.php'; // Kết nối cơ sở dữ liệu
+require_once 'config/db.php';
+include 'views/shared/header.php';
 
-// Kiểm tra nếu người dùng đã đăng nhập
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit();
+// Xử lý tìm kiếm
+$search = $_GET['q'] ?? '';
+$sql = "SELECT * FROM tours WHERE status='active'";
+if ($search) {
+    $sql .= " AND (tour_name LIKE :search OR description LIKE :search)";
 }
-
-// Lấy thông tin người dùng
-$ten = $_SESSION['ten'];
-$anh_dai_dien = isset($_SESSION['anh_dai_dien']) && !empty($_SESSION['anh_dai_dien'])
-    ? $_SESSION['anh_dai_dien']
-    : 'assets/images/default.png';
-
-// Lấy các tour nổi bật từ cơ sở dữ liệu
-$query = $pdo->prepare("SELECT * FROM tours LIMIT 3");
-$query->execute();
-$tours = $query->fetchAll();
+$sql .= " LIMIT 6";
+$stmt = $pdo->prepare($sql);
+if ($search) {
+    $stmt->execute(['search' => "%$search%"]);
+} else {
+    $stmt->execute();
+}
+$tours = $stmt->fetchAll();
 ?>
 
-<!DOCTYPE html>
-<html lang="vi">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trang chủ - Đồng Tháp Tour</title>
-    <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@400;600&display=swap"
-        rel="stylesheet">
-    <style>
-    body {
-        font-family: 'Poppins', sans-serif;
-        background: url('assets/images/dongthap.png') no-repeat center center fixed;
-        background-size: cover;
-        margin: 0;
-        padding: 0;
-    }
-
-    /* --- Header --- */
-    header {
-        background-color: #007bff;
-        color: white;
-        padding: 10px 25px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
-    }
-
-    .logo-container {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .logo-container img {
-        width: 60px;
-        height: 60px;
-        border-radius: 15px;
-        background: white;
-        padding: 6px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    }
-
-    .logo-container h2 {
-        font-family: 'Pacifico', cursive;
-        font-size: 28px;
-        color: #fff;
-        margin: 0;
-        text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.3);
-    }
-
-    .user-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .user-info img {
-        width: 40px;
-        height: 40px;
-        border-radius: 6px;
-        object-fit: cover;
-        border: 2px solid #fff;
-    }
-
-    .logout-btn {
-        background-color: white;
-        color: #007bff;
-        border: none;
-        padding: 6px 14px;
-        border-radius: 6px;
-        cursor: pointer;
-        text-decoration: none;
-        font-weight: 500;
-        transition: 0.2s;
-    }
-
-    .logout-btn:hover {
-        background-color: #e3f2fd;
-    }
-
-    /* --- Thanh menu --- */
-    nav {
-        background-color: #e3f2fd;
-        padding: 10px 25px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #007bff;
-        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    .nav-links a {
-        color: #007bff;
-        text-decoration: none;
-        margin: 0 15px;
-        font-weight: 500;
-        transition: 0.2s;
-    }
-
-    .nav-links a:hover {
-        text-decoration: underline;
-        color: #0056b3;
-    }
-
-    /* --- Khung nội dung --- */
-    .container {
-        max-width: 1100px;
-        margin: 70px auto;
-        background: rgba(255, 255, 255, 0.9);
-        padding: 50px;
-        border-radius: 12px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        text-align: center;
-    }
-
-    h1 {
-        color: #007bff;
-        font-size: 30px;
-        font-weight: 600;
-        margin-bottom: 15px;
-    }
-
-    p {
-        font-size: 17px;
-    }
-
-    .tour-list {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 20px;
-    }
-
-    .tour-item {
-        width: 30%;
-        text-align: center;
-        background-color: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-
-    .tour-item img {
-        width: 100%;
-        border-radius: 8px;
-    }
-
-    .tour-item h3 {
-        color: #007bff;
-        font-size: 18px;
-        margin: 10px 0;
-    }
-
-    .tour-item p {
-        font-size: 14px;
-        color: #555;
-    }
-
-    .tour-item a {
-        text-decoration: none;
-        color: #007bff;
-        font-weight: bold;
-    }
-
-    .tour-item a:hover {
-        text-decoration: underline;
-    }
-    </style>
-</head>
-
-<body>
-    <header>
-        <div class="logo-container">
-            <img src="assets/images/logo.png" alt="Logo Đồng Tháp Tour">
-            <h2>Đồng Tháp Tour</h2>
-        </div>
-
-        <div class="user-info">
-            <img src="<?php echo htmlspecialchars($anh_dai_dien); ?>" alt="Avatar">
-            <a href="profile.php" style="color:white;"><b><?php echo htmlspecialchars($ten); ?></b></a> |
-            <a href="logout.php" class="logout-btn">Đăng xuất</a>
-        </div>
-    </header>
-
-    <nav>
-        <div class="nav-links">
-            <a href="index.php">Trang chủ</a>
-            <a href="dat_tour.php">Đặt tour</a>
-            <a href="#">Giới thiệu</a>
-            <a href="#">Liên hệ</a>
-            <a href="#">Ưu đãi</a>
-        </div>
-    </nav>
-
+<header class="hero-section text-center">
     <div class="container">
-        <h1>Chào mừng <?php echo htmlspecialchars($ten); ?> đến với Đồng Tháp Tour!</h1>
-        <p>Khám phá vẻ đẹp miền Tây — Đồng Tháp sen hồng 🌸</p>
+        <h1 class="display-4 fw-bold">Khám Phá Vẻ Đẹp Đất Sen Hồng</h1>
+        <p class="lead mb-4">Trải nghiệm du lịch sinh thái, văn hóa và ẩm thực độc đáo tại Đồng Tháp.</p>
 
-        <h2>Các Tour Du Lịch Nổi Bật</h2>
-        <div class="tour-list">
-            <?php foreach ($tours as $tour): ?>
-            <div class="tour-item">
-                <img src="assets/images/<?php echo $tour['image']; ?>" alt="Tour <?php echo $tour['tour_id']; ?>">
-                <h3><?php echo $tour['tour_name']; ?></h3>
-                <p><?php echo $tour['description']; ?></p>
-                <a href="tour_details.php?id=<?php echo $tour['tour_id']; ?>">Xem chi tiết</a>
-            </div>
-            <?php endforeach; ?>
-        </div>
-
-        <p style="margin-top:20px;">Trang này chỉ xem được khi bạn đã đăng nhập.</p>
+        <form action="index.php" method="GET" class="d-flex justify-content-center mx-auto" style="max-width: 600px;">
+            <input class="form-control form-control-lg me-2" type="search" name="q"
+                placeholder="Bạn muốn đi đâu? (VD: Tràm Chim...)" value="<?php echo htmlspecialchars($search); ?>">
+            <button class="btn btn-warning btn-lg fw-bold" type="submit">Tìm kiếm</button>
+        </form>
     </div>
+</header>
+
+<div class="container my-5">
+    <h2 class="text-center text-primary mb-4"><i class="fas fa-map-marked-alt"></i> Các Tour Nổi Bật</h2>
+
+    <div class="row g-4">
+        <?php if (count($tours) > 0): ?>
+        <?php foreach ($tours as $tour): ?>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0 hover-effect">
+                <div class="position-relative">
+                    <img src="assets/images/<?php echo htmlspecialchars($tour['image']); ?>" class="card-img-top"
+                        alt="<?php echo htmlspecialchars($tour['tour_name']); ?>"
+                        style="height: 200px; object-fit: cover;">
+                    <span class="position-absolute top-0 end-0 bg-danger text-white px-2 py-1 m-2 rounded fw-bold">
+                        <?php echo number_format($tour['price'], 0, ',', '.'); ?>đ
+                    </span>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title fw-bold text-truncate"><?php echo htmlspecialchars($tour['tour_name']); ?>
+                    </h5>
+                    <p class="card-text text-muted small"><i class="far fa-clock"></i>
+                        <?php echo $tour['start_date']; ?> - <?php echo $tour['end_date']; ?></p>
+                    <p class="card-text text-secondary" style="height: 4.5em; overflow: hidden;">
+                        <?php echo htmlspecialchars(substr($tour['description'], 0, 100)) . '...'; ?>
+                    </p>
+                </div>
+                <div class="card-footer bg-white border-top-0 d-flex justify-content-between align-items-center pb-3">
+                    <a href="tour_details.php?id=<?php echo $tour['tour_id']; ?>"
+                        class="btn btn-outline-primary btn-sm">Xem chi tiết</a>
+                    <a href="booking.php?id=<?php echo $tour['tour_id']; ?>" class="btn btn-primary btn-sm"><i
+                            class="fas fa-shopping-cart"></i> Đặt ngay</a>
+                </div>
+            </div>
+        </div>
+        <?php endforeach; ?>
+        <?php else: ?>
+        <div class="col-12 text-center text-muted">Không tìm thấy tour nào phù hợp.</div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<section class="bg-light py-5">
+    <div class="container text-center">
+        <h3 class="mb-4">Tại sao chọn chúng tôi?</h3>
+        <div class="row">
+            <div class="col-md-4">
+                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                <h5>Uy tín hàng đầu</h5>
+                <p>Dịch vụ chất lượng, đảm bảo an toàn cho mọi du khách.</p>
+            </div>
+            <div class="col-md-4">
+                <i class="fas fa-tags fa-3x text-warning mb-3"></i>
+                <h5>Giá cả hợp lý</h5>
+                <p>Nhiều ưu đãi hấp dẫn và chính sách giá minh bạch.</p>
+            </div>
+            <div class="col-md-4">
+                <i class="fas fa-headset fa-3x text-info mb-3"></i>
+                <h5>Hỗ trợ 24/7</h5>
+                <p>Đội ngũ nhân viên nhiệt tình, sẵn sàng hỗ trợ mọi lúc.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="bg-dark text-white py-4 mt-auto">
+    <div class="container text-center">
+        <p>&copy; 2025 Đồng Tháp Tour. Design by QuocViet.</p>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 
 </html>
